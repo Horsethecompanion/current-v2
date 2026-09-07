@@ -1,15 +1,16 @@
 /* Current v2 Styling — All-In Cost Display */
 
-/* Override priceContainer to stack two prices */
+/* Main price container */
 #priceContainer {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1rem;
+    gap: 0.8rem;
 }
 
-#price {
+/* All-in price (PRIMARY — big & bold like Current v1) */
+#allInPrice {
     font-size: 4rem;
     font-weight: 300;
     letter-spacing: -0.05em;
@@ -17,7 +18,7 @@
     text-align: center;
 }
 
-#units {
+#allInUnits {
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -25,33 +26,31 @@
     text-align: center;
 }
 
-/* All-in price section */
-#allInPriceContainer {
+/* Wholesale spot price (SECONDARY — small & subtle) */
+#wholesaleContainer {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    gap: 0.2rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
     width: 100%;
 }
 
-#allInPrice {
-    font-size: 3rem;
+#price {
+    font-size: 1.2rem;
     font-weight: 400;
-    letter-spacing: -0.05em;
+    letter-spacing: -0.02em;
     line-height: 1;
     text-align: center;
-    background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-    padding: 1rem;
-    border-radius: 8px;
+    opacity: 0.7;
 }
 
-#allInUnits {
-    font-size: 0.85rem;
+#units {
+    font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    opacity: 0.6;
+    opacity: 0.5;
     text-align: center;
 }
 
@@ -75,25 +74,25 @@
 
 /* Mobile adjustments */
 @media (max-width: 480px) {
-    #price {
-        font-size: 3.5rem;
-    }
-
-    #units {
-        font-size: 0.75rem;
-    }
-
     #allInPrice {
-        font-size: 2.5rem;
+        font-size: 3.5rem;
     }
 
     #allInUnits {
         font-size: 0.75rem;
     }
 
-    #allInPriceContainer {
-        padding-top: 1rem;
-        gap: 0.25rem;
+    #price {
+        font-size: 1rem;
+    }
+
+    #units {
+        font-size: 0.65rem;
+    }
+
+    #wholesaleContainer {
+        padding-top: 0.6rem;
+        gap: 0.15rem;
     }
 }
 
@@ -105,10 +104,6 @@ body.night #priceBackdrop {
         rgba(0, 0, 0, 0.05) 70%,
         transparent 100%
     );
-}
-
-body.night #allInPrice {
-    background: linear-gradient(135deg, rgba(0,0,0,0.2), rgba(0,0,0,0.1));
 }
 
 /* Ensure settings text still readable */
