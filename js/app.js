@@ -1,4 +1,5 @@
 const priceElement = document.getElementById("price");
+const allInPriceElement = document.getElementById("allInPrice");
 const updatedElement = document.getElementById("updated");
 const statusElement = document.getElementById("status");
 const hoursLeftElement = document.getElementById("hoursLeft");
@@ -10,21 +11,67 @@ const dataSource = CONFIG.useMockData
 
 let displayedPrice = 0;
 let targetPrice = 0;
+let displayedAllInPrice = 0;
+let targetAllInPrice = 0;
 
 let lastFrame = performance.now();
 
-function withMargin(data) {
+/**
+ * Calculate all-in cost from wholesale spot price
+ * Includes: spot + powerhub fee + distribution + transmission + levy + daily fixed
+ * 
+ * Distribution charge varies by season (Vector's seasonal peak windows):
+ * - June–August: 07:00–11:00 peak only
+ * - September–May: 17:00–22:00 (5pm–10pm) peak only
+ */
+function calculateAllInCost(spotPricePerMwh, dateTime) {
+    
+    // Convert spot price from $/MWh to c/kWh
+    const spotPrice = spotPricePerMwh / 10;
+    
+    // PowerHub fee: 10% of spot price
+    const powerhubFee = spotPrice * (CONFIG.tariff.powerhubFee / 100);
+    
+    // Distribution charge: depends on seasonal peak/off-peak hours
+    const hour = dateTime.getHours();
+    const month = dateTime.getMonth(); // 0–11 (Jan=0, Dec=11)
+    
+    let isPeak;
+    
+    if (CONFIG.tariff.peakHours.winterMonths.includes(month)) {
+        // Winter (June–August): 7–11am peak
+        isPeak = hour >= CONFIG.tariff.peakHours.winterPeakStart && 
+                 hour < CONFIG.tariff.peakHours.winterPeakEnd;
+    } else {
+        // Other months (Sept–May): 5–10pm peak
+        isPeak = hour >= CONFIG.tariff.peakHours.otherPeakStart && 
+                 hour < CONFIG.tariff.peakHours.otherPeakEnd;
+    }
+    
+    const distributionCharge = isPeak 
+        ? CONFIG.tariff.distribution.peak 
+        : CONFIG.tariff.distribution.offpeak;
+    
+    // Fixed charges (transmission + levy + daily fixed)
+    const transmission = CONFIG.tariff.transmission;
+    const eaLevy = CONFIG.tariff.eaLevy;
+    const dailyFixed = CONFIG.tariff.dailyFixedPerHalfHour;
+    
+    // All-in cost in c/kWh
+    const allInCost = spotPrice + powerhubFee + distributionCharge + transmission + eaLevy + dailyFixed;
+    
+    return allInCost;
+}
 
-    const settings = getMarginSettings();
-
-    if (settings.value === 0)
-        return data;
-
+/**
+ * Enhance data with all-in cost calculation
+ */
+function enrichDataWithAllInCost(data) {
     return data.map(d => ({
         time: d.time,
-        price: applyMargin(d.price, settings)
+        price: d.price,  // Wholesale spot price (c/kWh)
+        allInPrice: calculateAllInCost(d.price * 10, d.time)  // Convert back to $/MWh for calculation
     }));
-
 }
 
 function animate(now) {
@@ -34,10 +81,12 @@ function animate(now) {
 
     // ----- Data -----
 
-    const data = withMargin(dataSource.getData());
+    const rawData = dataSource.getData();
+    const data = enrichDataWithAllInCost(rawData);
     const currentIndex = dataSource.getCurrentIndex();
 
     targetPrice = data[currentIndex].price;
+    targetAllInPrice = data[currentIndex].allInPrice;
 
     renderer.draw(data);
 
@@ -46,19 +95,22 @@ function animate(now) {
     // ----- Smooth number animation -----
 
     displayedPrice += (targetPrice - displayedPrice) * Math.min(dt * 5, 1);
+    displayedAllInPrice += (targetAllInPrice - displayedAllInPrice) * Math.min(dt * 5, 1);
 
-    priceElement.textContent =
-        displayedPrice.toFixed(CONFIG.decimals);
+    priceElement.textContent = displayedPrice.toFixed(CONFIG.decimals);
+    
+    if (allInPriceElement) {
+        allInPriceElement.textContent = displayedAllInPrice.toFixed(CONFIG.decimals);
+    }
 
     // ----- Time -----
 
     const t = new Date();
 
-    updatedElement.textContent =
-        t.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit"
-        });
+    updatedElement.textContent = t.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+    });
 
     // ----- Night mode -----
 
@@ -91,24 +143,19 @@ const refreshSeconds = CONFIG.useMockData
     : CONFIG.dataRefreshSeconds;
 
 setInterval(() => {
-
     dataSource.refresh();
-
 }, refreshSeconds * 1000);
 
 
 //------------------------------------------------------------
-// Status dot: green = live, amber = stale (no fresh fetch yet
-// but still showing last known data), handled via CSS classes
+// Status dot
 //------------------------------------------------------------
 
 function updateStatus() {
 
     if (CONFIG.useMockData) {
-
         statusElement.classList.remove("stale");
         return;
-
     }
 
     statusElement.classList.toggle("stale", !STATE.connected);
@@ -126,10 +173,8 @@ document.body.addEventListener("click", () => {
         return;
 
     if (suppressNextClick) {
-
         suppressNextClick = false;
         return;
-
     }
 
     STATE.timelineHours =
@@ -152,7 +197,6 @@ document.body.addEventListener("touchstart", (e) => {
         return;
 
     e.preventDefault();
-
     clearTimeout(touchTimer);
 
     touchTimer = setTimeout(() => {
@@ -181,22 +225,17 @@ function showNightModeToast() {
     let toast = document.getElementById("nightToast");
 
     if (!toast) {
-
         toast = document.createElement("div");
         toast.id = "nightToast";
         document.body.appendChild(toast);
-
     }
 
     toast.textContent = label;
     toast.classList.add("visible");
 
     clearTimeout(showNightModeToast._timer);
-
     showNightModeToast._timer = setTimeout(() => {
-
         toast.classList.remove("visible");
-
     }, 1600);
 
 }
@@ -209,21 +248,12 @@ function showNightModeToast() {
 function updateNightMode() {
 
     if (STATE.nightModeOverride !== null) {
-
         applyNightMode();
-
         return;
-
     }
 
     const hour = new Date().getHours();
-
-    const night =
-
-        hour >= CONFIG.nightStartHour ||
-
-        hour < CONFIG.nightEndHour;
-
+    const night = hour >= CONFIG.nightStartHour || hour < CONFIG.nightEndHour;
     document.body.classList.toggle("night", night);
 
 }
@@ -231,35 +261,22 @@ function updateNightMode() {
 function applyNightMode() {
 
     if (STATE.nightModeOverride === null) {
-
         document.body.classList.remove("night");
-
         return;
-
     }
 
-    document.body.classList.toggle(
-
-        "night",
-
-        STATE.nightModeOverride
-
-    );
+    document.body.classList.toggle("night", STATE.nightModeOverride);
 
 }
 
+
 //------------------------------------------------------------
-// Long-press = open Settings (location + retail margin).
-// Two-finger tap is already night mode, single tap is already zoom —
-// long-press on an otherwise-unused gesture keeps the "no visible
-// buttons" look intact.
+// Long-press = open Settings
 //------------------------------------------------------------
 
 const settingsOverlay = document.getElementById("settingsOverlay");
 const knownNodesEl = document.getElementById("knownNodes");
 const customNodeInput = document.getElementById("customNode");
-const marginInputEl = document.getElementById("marginInput");
-const marginUnitEl = document.getElementById("marginUnit");
 
 let pressTimer = null;
 let suppressNextClick = false;
@@ -277,26 +294,17 @@ document.body.addEventListener("pointerdown", (e) => {
     activePointerCount++;
 
     if (activePointerCount > 1) {
-
-        // A second finger just landed — this is a two-finger gesture
-        // (night mode), not a long-press candidate. Cancel any pending
-        // timer so a first-finger timer can't fire later mid-gesture.
-
         clearTimeout(pressTimer);
         pressTimer = null;
         pressStart = null;
-
         return;
-
     }
 
     pressStart = { x: e.clientX, y: e.clientY };
 
     pressTimer = setTimeout(() => {
-
         suppressNextClick = true;
         openSettings();
-
     }, LONG_PRESS_MS);
 
 });
@@ -310,82 +318,57 @@ document.body.addEventListener("pointermove", (e) => {
     const dy = e.clientY - pressStart.y;
 
     if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) {
-
         clearTimeout(pressTimer);
         pressTimer = null;
-
     }
 
 });
 
 ["pointerup", "pointercancel"].forEach(evt =>
-
     document.body.addEventListener(evt, () => {
-
         activePointerCount = Math.max(0, activePointerCount - 1);
-
         clearTimeout(pressTimer);
         pressTimer = null;
         pressStart = null;
-
     })
-
 );
 
 
 function openSettings() {
-
     renderKnownNodes();
-
-    const settings = getMarginSettings();
-
-    marginInputEl.value = settings.value;
-    setMarginModeUI(settings.mode);
-
     settingsOverlay.classList.remove("hidden");
-
 }
 
 function closeSettings() {
-
     settingsOverlay.classList.add("hidden");
-
 }
 
 document.getElementById("closeSettings").addEventListener("click", closeSettings);
 
 settingsOverlay.addEventListener("click", (e) => {
-
     if (e.target === settingsOverlay)
         closeSettings();
-
 });
 
 
 function renderKnownNodes() {
 
     const current = getSelectedNode();
-
     knownNodesEl.innerHTML = "";
 
     KNOWN_NODES.forEach(node => {
-
         const btn = document.createElement("button");
-
         btn.type = "button";
         btn.className = "node-option" + (node.code === current ? " selected" : "");
         btn.textContent = `${node.name} — ${node.code}`;
 
         btn.addEventListener("click", () => {
-
             setSelectedNode(node.code);
             renderKnownNodes();
             dataSource.refresh?.();
-
         });
 
         knownNodesEl.appendChild(btn);
-
     });
 
 }
@@ -393,38 +376,25 @@ function renderKnownNodes() {
 document.getElementById("useMyLocation").addEventListener("click", () => {
 
     if (!("geolocation" in navigator)) {
-
         alert("Geolocation isn't available in this browser.");
         return;
-
     }
 
     navigator.geolocation.getCurrentPosition(
-
         (pos) => {
-
-            const nearest = nearestNode(
-                pos.coords.latitude,
-                pos.coords.longitude
-            );
+            const nearest = nearestNode(pos.coords.latitude, pos.coords.longitude);
 
             if (!nearest) {
-
-                alert("No known nodes to match against yet — add one, or enter your GXP code directly below.");
+                alert("No known nodes — enter your GXP code below.");
                 return;
-
             }
 
             setSelectedNode(nearest.code);
             renderKnownNodes();
             dataSource.refresh?.();
-
         },
-
-        () => alert("Couldn't get your location — check permissions, or enter your GXP code directly below."),
-
+        () => alert("Couldn't get location — enter your GXP code below."),
         { timeout: 10000 }
-
     );
 
 });
@@ -443,46 +413,9 @@ document.getElementById("applyCustomNode").addEventListener("click", () => {
 
 });
 
-document.getElementById("applyMargin").addEventListener("click", () => {
-
-    const value = Number(marginInputEl.value);
-    const mode = document.querySelector('input[name="marginMode"]:checked')?.value || "flat";
-
-    setMarginSettings(Number.isFinite(value) ? value : 0, mode);
-
-});
-
-function setMarginModeUI(mode) {
-
-    const radio = document.querySelector(`input[name="marginMode"][value="${mode}"]`);
-
-    if (radio)
-        radio.checked = true;
-
-    updateMarginUnitLabel(mode);
-
-}
-
-function updateMarginUnitLabel(mode) {
-
-    marginUnitEl.textContent = mode === "percent" ? "%" : "c/kWh";
-    marginInputEl.step = mode === "percent" ? "1" : "0.5";
-
-}
-
-document.querySelectorAll('input[name="marginMode"]').forEach(radio => {
-
-    radio.addEventListener("change", () => updateMarginUnitLabel(radio.value));
-
-});
-
 
 //------------------------------------------------------------
-// Request fullscreen. If installed as a PWA, manifest.json's
-// "display": "fullscreen" already handles this with no browser chrome
-// to hide in the first place. This is the fallback for a plain browser
-// tab — fullscreen requires a user gesture in most browsers, so it
-// can't just fire on page load; it fires on the first touch instead.
+// Fullscreen on first tap
 //------------------------------------------------------------
 
 function requestFullscreen() {
@@ -498,8 +431,4 @@ function requestFullscreen() {
 
 }
 
-// click, not pointerdown/touchstart — a click only fires once the
-// browser has confirmed the gesture is a tap (not the start of a
-// scroll), which Android Chrome is far more willing to honour a
-// fullscreen request from.
 document.body.addEventListener("click", requestFullscreen, { once: true });
