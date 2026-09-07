@@ -42,14 +42,14 @@
 
             <div id="priceBackdrop"></div>
 
-            <!-- Wholesale spot price -->
-            <div id="price">--</div>
-            <div id="units">c/kWh (wholesale)</div>
+            <!-- All-in cost (main display) -->
+            <div id="allInPrice">--</div>
+            <div id="allInUnits">c/kWh (all-in)</div>
 
-            <!-- All-in cost breakdown -->
-            <div id="allInPriceContainer">
-                <div id="allInPrice">--</div>
-                <div id="allInUnits">c/kWh (all-in)</div>
+            <!-- Wholesale spot price (secondary, small) -->
+            <div id="wholesaleContainer">
+                <div id="price">--</div>
+                <div id="units">c/kWh spot</div>
             </div>
 
         </div>
@@ -99,10 +99,10 @@
             <section>
                 <h3>About This Version</h3>
                 <p class="hint">
-                    Current v2 shows both wholesale spot price and your actual
-                    all-in electricity cost, including distribution charges,
-                    transmission, levies, and daily fixed costs. Configured for
-                    your specific location and tariff.
+                    Current v2 prioritizes your actual all-in electricity cost
+                    (big display), with wholesale spot price as reference (small).
+                    All-in includes distribution charges, transmission, levies,
+                    and daily fixed costs. Configured for your specific location.
                 </p>
                 <p class="hint">
                     Peak/off-peak split: 07:00–23:00 (peak) and 23:00–07:00 (off-peak).
