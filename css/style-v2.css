@@ -11,7 +11,7 @@
 
 /* All-in price (PRIMARY — big & bold like Current v1) */
 #allInPrice {
-    font-size: 4rem;
+    font-size: 4.5rem;    /* Match v1's size */
     font-weight: 300;
     letter-spacing: -0.05em;
     line-height: 1;
