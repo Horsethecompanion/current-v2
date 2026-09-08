@@ -1,151 +1,149 @@
-# Current
+# Current v2 — All-In Cost Display
 
-A minimalist, always-on display of the current New Zealand wholesale
-electricity price, with a colour-coded timeline showing where it's been
-and where it's forecast to go. Built to run on a spare phone or tablet
-mounted somewhere you'll glance at it — the goal is answering "is power
-cheap or expensive right now?" in under a second, not building a
-dashboard.
+A fork of [Current](https://github.com/Horsethecompanion/current) that shows your **real, all-in electricity cost** instead of wholesale spot price alone.
 
-**Live**: https://horsethecompanion.github.io/current/
+Live at: https://horsethecompanion.github.io/current-v2/
 
-This deploy is already wired up and running on real data — Albany
-(North Shore, Auckland) by default, with a Cloudflare Worker fetching
-live NZ wholesale prices. Anyone else running it can change the location
-from within the app itself; no code editing required (see Settings,
-below).
+## What's Different
 
-## What it looks like
+**Current v1** shows wholesale spot price (what the grid cost the retailer).
 
-- A single large number: the current wholesale price, in c/kWh (plus
-  your retail margin, if you've set one).
-- A full-screen background timeline, coloured from cheap (green) through
-  to expensive (red/crimson), with "now" in the centre — history to the
-  left, forecast to the right.
-- Tap anywhere to zoom the timeline between ±4h and ±24h, with a smooth
-  animated transition.
-- Long-press anywhere to open **Settings**:
-  - Pick a location from a built-in list of major NZ centres, hit "Use
-    my location" to jump to the nearest one, or type any GXP code
-    directly if yours isn't listed.
-  - Set a retail margin, as either a flat c/kWh add-on or a percentage
-    on top of wholesale. Leave at 0 to show wholesale only.
-  - Both choices persist locally in the browser (`localStorage`), so
-    they survive reloads.
-- Two-finger tap cycles night mode (auto → on → off → auto), each change
-  confirmed with a brief on-screen label so it's obvious which state you
-  landed on. Night mode meaningfully dims the whole display, not just
-  the text — comfortable to glance at in a dark room.
-- A small status dot: green means the last live price fetch succeeded;
-  amber means it failed and you're looking at the last data that did
-  work (the display never just goes blank).
-- Installable as a PWA (add to home screen) for a proper chrome-free,
-  fullscreen kiosk display. In a regular browser tab, the first tap
-  requests fullscreen too.
+**Current v2** shows **your actual all-in cost** including:
+- Wholesale spot price
+- PowerHub retail fee (10% of spot)
+- Distribution network charge (Vector: $0.1047/kWh peak, $0.00 off-peak)
+- Transmission charge ($0.0355/kWh flat)
+- Electricity Authority levy ($0.0029/kWh)
+- Daily fixed costs (~$0.05/half-hour amortized)
 
-## How it's built
+## Why It Matters
 
-Plain HTML/CSS/JS, no build step, no frameworks:
+On a winter evening at 19:30:
+- **v1 shows:** 444 c/kWh (spot only)
+- **v2 shows:** 503 c/kWh (your actual cost)
 
-```
-index.html
-css/style.css
-js/
-  config.js     — all the tunable settings and live defaults
-  nodes.js      — known GXP locations + Settings persistence (node, margin)
-  mockdata.js   — synthetic data generator (realistic daily price shape)
-  livedata.js   — polls the live data source, matches mockdata's interface
-  renderer.js   — canvas rendering: colour scale, gradients, timeline, ticks
-  app.js        — glues it together, handles animation/interaction/gestures
-manifest.json, sw.js  — PWA shell (installable, caches app files for
-                        offline resilience — never caches price data)
-cloudflare-worker/    — see below
-```
+That extra ~60 c/kWh is real money—10% retail margin, distribution peak surcharge, and fixed costs.
 
-The renderer doesn't know or care where its data comes from — `mockdata.js`
-and `livedata.js` expose the same interface (`getData()`,
-`getCurrentIndex()`, `getCurrentPrice()`, `refresh()`), so switching
-between them is a one-line config change. Retail margin is applied as a
-separate display-layer transform on top of whichever data source is
-active, so it works identically for both.
+Over a month, the floor cost is ~4–5 c/kWh (off-peak) vs ~15 c/kWh (peak), even when spot is zero. **This is why load-shifting matters.**
 
-### Where the price data comes from
+## Seasonal Peak Windows (Vector)
 
-NZ wholesale electricity prices are published per grid connection point
-(GXP) by [WITS](https://developer.electricityinfo.co.nz/WITS/login)
-(electricityinfo.co.nz).
+Current v2 automatically detects the season and applies Vector's peak rates:
 
-Browsers can't safely call the WITS API directly — it needs an OAuth
-client secret, which can't be exposed in client-side JS. So there's a
-small Cloudflare Worker (`cloudflare-worker/`) that sits in between: it
-holds the credentials, fetches both the actual settled prices (`RTD`
-schedule) and the forward price schedule (`PRSL`), merges them into one
-time series, and caches the result at Cloudflare's edge for ~60 seconds.
-The app just polls that Worker — no keys, no CORS problems.
+- **June–August (Winter):** Peak 07:00–11:00 only
+- **September–May (Other months):** Peak 17:00–22:00 (5pm–10pm)
+- **Off-peak:** All other hours at $0.00/kWh distribution
 
-Full setup steps (getting WITS API access, deploying the Worker) are in
-[`cloudflare-worker/README.md`](cloudflare-worker/README.md).
+Watch the heatmap change as the season transitions—morning peaks in winter, evening peaks the rest of the year.
 
-## Running your own copy
+## Display Layout
 
-This repo is already configured to point at a live Worker and node —
-clone it and it'll just work, showing real prices for Albany by default.
+**Big bold number:** All-in cost (4.5rem, like Current v1)  
+**Small label below:** Wholesale spot price for reference
 
-To point it at your own Worker instead (recommended if you're forking
-this rather than just using it — see the note on shared infrastructure
-below):
+The heatmap uses the same colour scale as v1, so yellow appears around 15–20 c/kWh all-in (when you really want to shift load).
 
-1. Follow [`cloudflare-worker/README.md`](cloudflare-worker/README.md)
-   to get your own WITS API access and deploy your own Worker.
-2. In `js/config.js`, set `workerUrl` to your deployed Worker's URL.
-3. In `cloudflare-worker/wrangler.toml`, set `ALLOWED_ORIGIN` to wherever
-   you're hosting your copy.
-4. Deploy `index.html` and friends anywhere static (GitHub Pages, any
-   static host). No server-side code needed beyond the Worker itself.
+## Updating Rates (Quarterly)
 
-Want to work on it locally without touching live data? Set
-`useMockData: true` in `js/config.js` — shows a synthetic but realistic
-price pattern with no API setup at all.
+Your PowerHub invoice changes quarterly. To update v2:
+
+1. Open your latest invoice
+2. Find these line items and their rates:
+   - "Distribution Network Charges — Peak"
+   - "Distribution Network Charges — Off-peak"
+   - "Transmission (Transpower)"
+   - "Electricity Authority Levy"
+   - Sum of "Distribution Daily Fixed" + "Metering" + "Billing"
+
+3. Edit `js/config.js`:
+   ```javascript
+   tariff: {
+       distribution: {
+           peak: X.XX,        // c/kWh from invoice
+           offpeak: 0.00
+       },
+       transmission: Y.YY,    // c/kWh from invoice
+       eaLevy: Z.ZZ,         // c/kWh from invoice
+       dailyFixedPerHalfHour: (TOTAL_DAILY_FIXED) / 31 / 48
+   }
+   ```
+
+4. Commit and push:
+   ```bash
+   git add js/config.js
+   git commit -m "Update tariff rates — new invoice"
+   git push origin main
+   ```
+
+Pages rebuilds automatically.
 
 ## Configuration
 
-Everything tunable lives in `js/config.js`:
+All settings in `js/config.js`. Key config:
 
-- `gxpNode` — default GXP, used until someone picks a different one in
-  Settings.
-- `retailMargin` — default margin value (flat c/kWh or percentage,
-  see `js/nodes.js`), also overridable per-device from Settings.
-- `historyHours` / `forecastHours` — how far back/forward the timeline
-  shows by default.
-- `colourStops` / `priceScale` — the colour ramp. Prices are mapped
-  through a piecewise linear→log scale before colouring, so normal daily
-  movement (5–25 c/kWh) stays visually informative while rare price
-  spikes (hundreds to low thousands of c/kWh, which do happen during NZ
-  market scarcity events) still read as distinct rather than all
-  clamping to the same dark red.
-- `dataRefreshSeconds` — how often the app polls the Worker.
+```javascript
+tariff: {
+    peakHours: {
+        winterMonths: [5, 6, 7],        // June, July, August
+        winterPeakStart: 7,             // 7am
+        winterPeakEnd: 11,              // 11am
+        otherPeakStart: 17,             // 5pm (Sept-May)
+        otherPeakEnd: 22                // 10pm
+    },
+    distribution: { peak: 10.47, offpeak: 0.00 },
+    transmission: 3.55,
+    eaLevy: 0.29,
+    powerhubFee: 10,    // % of spot
+    dailyFixedPerHalfHour: 0.050
+}
+```
 
-### Node list
+## If Your Network Is Different
 
-`js/nodes.js` has a curated list of GXPs for major NZ population centres,
-matched against WITS's own official node reference list — so the
-code-to-place mapping is authoritative, not a guess. Only Albany has
-actually been fetch-tested end-to-end against live price data; the rest
-are almost certainly fine (they're all major, actively-traded GXPs), but
-if one comes back empty, it fails safely — amber status dot, last good
-data retained, never a silently-wrong number. The in-app "Custom GXP
-code" field works for anywhere not on the list, no code change needed.
+Peak/off-peak hours, transmission rate, and distribution charges vary by network. To adapt v2 for a different GXP:
 
-## Worth knowing
+1. Update the `tariff` config in `js/config.js` with your network's rates
+2. Update `peakHours` with your network's peak/off-peak split
+3. Change `gxpNode` in config to your GXP code
+4. Verify the calculation by comparing one month of v2 prices to your invoice
 
-If someone uses this deploy as-is (rather than forking it with their own
-Worker), their price requests go through the original deployer's
-Cloudflare account and WITS subscription. Fine at hobby scale — free
-Cloudflare Workers tier is 100,000 requests/day — but worth being aware
-of if this gets shared around.
+## Known Limitations
+
+1. **Rounding:** Your invoice may differ by $0.01–0.02/month due to rounding
+2. **Controlled loads:** If you have ripple-controlled circuits on separate tariffs, v2 treats all usage the same
+3. **Export (solar):** No support yet; would need to reverse the calculation for export periods
+4. **Seasonal split complexity:** Some networks have more than two peak windows (shoulder rates, etc.). Would need additional logic
+
+## Testing
+
+Open in a browser and:
+- **Green dot** (bottom right) = connected to WITS data ✓
+- **All-in number** = big and bold (4.5rem)
+- **Wholesale number** = tiny below (1.2rem)
+- **Heatmap** = shows colours matching v1 scale
+- **Seasonal transition:** In June/July at 8am, price should spike (winter peak). In December at 8am, should be cheap (off-peak).
+
+## Files
+
+- `js/config.js` — Tariff rates (update quarterly)
+- `js/app.js` — All-in cost calculation + animation
+- `index.html` — Dual-price layout
+- `css/style-v2.css` — Styling for all-in-first display
+- `js/livedata.js`, `js/renderer.js`, etc. — Inherited from Current v1 (unchanged)
+
+## Data Source
+
+Fetches live WITS prices from Cloudflare worker (`current-prices.workers.dev`). Same backend as Current v1.
 
 ## License
 
-Personal project, shared as-is. No warranty — check the current price
-against your retailer's own tools before making any decision that costs
-real money.
+Same as Current v1. See the original [Current repo](https://github.com/Horsethecompanion/current) for licensing.
+
+## Authors
+
+- **Current v1:** Tim Barlow ([@Horsethecompanion](https://github.com/Horsethecompanion))
+- **Current v2 (All-In Cost):** Generated with Claude (Anthropic)
+
+---
+
+Questions? Check the implementation guide or file an issue.
