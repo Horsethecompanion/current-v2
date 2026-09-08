@@ -11,11 +11,13 @@
 
 /* All-in price (PRIMARY — big & bold like Current v1) */
 #allInPrice {
-    font-size: 6.5rem;   !important; 
-    font-weight: 300;
-    letter-spacing: -0.05em;
-    line-height: 1;
-    text-align: center;
+    font-size: 6.5rem !important;
+    font-weight: 300 !important;
+    letter-spacing: -0.05em !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    display: block !important;
+    width: 100% !important;
 }
 
 #allInUnits {
