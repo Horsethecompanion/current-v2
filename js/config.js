@@ -83,26 +83,25 @@ const CONFIG = {
         dailyFixedPerHalfHour: (59.58 + 10.55 + 5.00) / 31 / 48  // ~0.050 c/period
     },
 
-    // Colour scale - same as v1, but scaled for higher all-in costs
-    // All-in costs will typically be 2-3x spot price
-    priceScale: {
-        linearMax: 80,      // c/kWh - top of normal range for all-in cost
-        spikeMax: 3000,     // c/kWh - peak all-in during scarcity events
-        linearFraction: 0.7
-    },
+// Colour scale - adjusted for all-in costs
+priceScale: {
+    linearMax: 30,      // c/kWh - lower this so yellows appear sooner
+    spikeMax: 500,      // c/kWh - adjust spike threshold
+    linearFraction: 0.7
+},
 
-    colourStops: [
-        { value: 0,    colour: "#156b37" },
-        { value: 15,   colour: "#2f9f4b" },
-        { value: 30,   colour: "#89c541" },
-        { value: 45,   colour: "#d6c73a" },
-        { value: 60,   colour: "#d9b530" },
-        { value: 90,   colour: "#d77b2a" },
-        { value: 135,  colour: "#cf4c2e" },
-        { value: 240,  colour: "#7d1f1f" },
-        { value: 750,  colour: "#5c1420" },
-        { value: 3000, colour: "#200308" }
-    ]
+colourStops: [
+    { value: 0,    colour: "#156b37" },
+    { value: 5,    colour: "#2f9f4b" },   // Light green up to 5
+    { value: 10,   colour: "#89c541" },   // Yellow-green at 10
+    { value: 15,   colour: "#d6c73a" },   // Yellow at 15
+    { value: 20,   colour: "#d9b530" },   // Orange-yellow at 20
+    { value: 30,   colour: "#d77b2a" },   // Orange at 30
+    { value: 50,   colour: "#cf4c2e" },   // Red-orange at 50
+    { value: 100,  colour: "#7d1f1f" },   // Dark red at 100
+    { value: 200,  colour: "#5c1420" },
+    { value: 500,  colour: "#200308" }
+]
 
 };
 
