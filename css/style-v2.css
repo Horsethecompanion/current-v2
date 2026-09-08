@@ -11,13 +11,19 @@
 
 /* All-in price (PRIMARY — big & bold like Current v1) */
 #allInPrice {
-    font-size: 6.5rem !important;
-    font-weight: 300 !important;
+    position: relative !important;
+    z-index: 1 !important;
+    
+    font-size: min(28vw, 220px) !important;  /* Responsive like original #price */
+    line-height: .82 !important;
+    font-weight: 700 !important;  /* Bold */
     letter-spacing: -0.05em !important;
-    line-height: 1 !important;
-    text-align: center !important;
-    display: block !important;
-    width: 100% !important;
+    
+    text-shadow:
+        0 4px 20px rgba(0,0,0,.5),
+        0 1px 4px rgba(0,0,0,.35) !important;
+    
+    transition: opacity .3s !important;
 }
 
 #allInUnits {
